@@ -1,28 +1,29 @@
-import { initializeKeypair } from "./initializeKeypair"
 import * as web3 from "@solana/web3.js"
 import * as splToken from "@solana/spl-token"
+import {getExplorerLink, initializeKeypair} from "@solana-developers/helpers"
 
 const PROGRAM_ID = new web3.PublicKey(
   "HYkps3qJ9Uqq2NNTwU3VhpG2EaJgg1L4qsyXVnAvtYNJ"
 )
 
-async function initializeProgramTokenMint(
+function initializeProgramTokenMint(
   connection: web3.Connection,
   signer: web3.Keypair,
-  programId: web3.PublicKey
+  programId: web3.PublicKey 
 ): Promise<string> {
-  const [tokenMint] = await web3.PublicKey.findProgramAddress(
+  try {
+  const [tokenMint] = web3.PublicKey.findProgramAddressSync(
     [Buffer.from("token_mint")],
-    PROGRAM_ID
+    programId
   )
-  const [tokenAuth] = await web3.PublicKey.findProgramAddress(
+  const [tokenAuth] = web3.PublicKey.findProgramAddressSync(
     [Buffer.from("token_auth")],
-    PROGRAM_ID
+    programId
   )
 
   splToken.createInitializeMintInstruction
-  const tx = new web3.Transaction()
-  const ix = new web3.TransactionInstruction({
+  const transaction = new web3.Transaction()
+  const instruction = new web3.TransactionInstruction({
     keys: [
       {
         pubkey: signer.publicKey,
@@ -59,26 +60,34 @@ async function initializeProgramTokenMint(
     data: Buffer.from([3]),
   })
 
-  tx.add(ix)
-  return await web3.sendAndConfirmTransaction(connection, tx, [signer])
+  transaction.add(instruction)
+
+  return web3.sendAndConfirmTransaction(connection, transaction, [signer])
+
+} catch (error:any) {
+    throw new Error(`Failed to initialize program token mint: ${error.message}`);
+  }
 }
 
-async function main() {
+
+try {
   const connection = new web3.Connection("http://localhost:8899") //web3.clusterApiUrl("devnet"))
-  const signer = await initializeKeypair(connection)
 
-  const txid = await initializeProgramTokenMint(connection, signer, PROGRAM_ID)
-  console.log(
-    `Transaction submitted: https://explorer.solana.com/tx/${txid}?cluster=devnet`
-  )
+  const signer = await initializeKeypair(connection, {
+    airdropAmount: web3.LAMPORTS_PER_SOL * 5,
+  });
+
+  const transactionId = await initializeProgramTokenMint(connection, signer, PROGRAM_ID)
+
+  const explorerLink = getExplorerLink("transaction",transactionId, "devnet")
+
+  console.log(explorerLink)
+
+} catch (error:any) {
+    throw new Error(`Failed to initialize program token mint: ${error.message}`);
 }
 
-main()
-  .then(() => {
-    console.log("Finished successfully")
-    process.exit(0)
-  })
-  .catch((error) => {
-    console.log(error)
-    process.exit(1)
-  })
+ console.log("Finished successfully");
+ process.exit(0);
+
+
